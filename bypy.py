@@ -37,12 +37,11 @@ Though from my experience, it seems that some proxy servers may not be supported
 @author:     Hou Tianze (GitHub: houtianze) and contributors
 @license:    MIT
 '''
-
 # from __future__ imports must occur at the beginning of the file
 from __future__ import unicode_literals
 from __future__ import print_function
 from __future__ import division
-
+import fnmatch
 ### special variables that say about this module
 __version__ = '1.2.22'
 
@@ -1382,6 +1381,7 @@ class ByPy(object):
 		resumedownload = True,
 		extraupdate = lambda: (),
 		incregex = '',
+		exclude_wildcard = None,
 		ondup = '',
 		followlink = True,
 		checkssl = True,
@@ -1464,6 +1464,7 @@ class ByPy(object):
 		self.__extraupdate = extraupdate
 		self.__incregex = incregex
 		self.__incregmo = re.compile(incregex)
+		self.__exclude_wildcard = exclude_wildcard
 		if ondup and len(ondup) > 0:
 			self.__ondup = ondup[0].upper()
 		else:
@@ -3359,16 +3360,23 @@ restore a file from the recycle bin
 		self.pd("Searching for fs_id to restore")
 		return self.__get(pcsurl + 'file', pars, self.__restore_search_act, rpath)
 
+	def __is_excluded(self, path):
+		if self.__exclude_wildcard != None:
+			for wildcard in self.__exclude_wildcard:
+				if fnmatch.fnmatch(path, wildcard):
+					return True
+		return False
+
 	def __proceed_local_gather(self, dirlen, walk):
 		#names.sort()
 		(dirpath, dirnames, filenames) = walk
-		if  "@" in dirpath:
+		if self.__is_excluded(dirpath[dirlen + 1:].replace('\\', '/')):
 			return ENoError
 		files = []
 		for name in filenames:
 			#fullname = os.path.join(dirpath, name)
 			fullname = joinpath(dirpath, name)
-			if '@' in fullname:
+			if self.__is_excluded(name):
 				continue
 			# ignore broken symbolic links
 			if not os.path.exists(fullname):
@@ -3379,8 +3387,9 @@ restore a file from the recycle bin
 		reldir = dirpath[dirlen:].replace('\\', '/')
 		place = self.__local_dir_contents.get(reldir)
 		for dir in dirnames:
-			if '@' not in dir:
+			if self.__is_excluded(dir) == False:
 				place.add(dir, PathDictTree('D'))
+
 		for file in files:
 			place.add(file[0], PathDictTree('F', size = file[1], md5 = file[2]))
 
@@ -4325,6 +4334,7 @@ def getparser():
 	parser.add_argument("-f", "--force-hash", dest="forcehash", action="store_true", help="force file MD5 / CRC32 calculation instead of using cached value")
 	parser.add_argument("--resume-download", dest="resumedl", default=True, help="resume instead of restarting when downloading if local file already exists [default: %(default)s]")
 	parser.add_argument("--include-regex", dest="incregex", default='', help="regular expression of files to include. if not specified (default), everything is included. for download, the regex applies to the remote files; for upload, the regex applies to the local files. to exclude files, think about your regex, some tips here: https://stackoverflow.com/questions/406230/regular-expression-to-match-string-not-containing-a-word [default: %(default)s]")
+	parser.add_argument("--exclude", dest="exclude", default=None,nargs='*', help="wildcard expression of files to exclude. [default: %(default)s]")
 	parser.add_argument("--on-dup", dest="ondup", default='overwrite', help="what to do when the same file / folder exists in the destination: 'overwrite', 'skip', 'prompt' [default: %(default)s]")
 	parser.add_argument("--no-symlink", dest="followlink", action="store_false", help="DON'T follow symbol links when uploading / syncing up")
 	parser.add_argument(DisableSslCheckOption, dest="checkssl", action="store_false", help="DON'T verify host SSL cerificate")
@@ -4434,6 +4444,7 @@ def main(argv=None): # IGNORE:C0111
 					quit_when_fail = args.quit,
 					resumedownload = args.resumedl,
 					incregex = args.incregex,
+					exclude_wildcard = args.exclude,
 					ondup = args.ondup,
 					followlink = args.followlink,
 					checkssl = args.checkssl,
