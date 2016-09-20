@@ -3057,7 +3057,7 @@ To stream a file, you can use the 'mkfifo' trick with omxplayer etc.:
 	def __walk_remote_dir(self, remotepath, proceed, args = None, skip_remote_only_dirs = False):
 		return self.__walk_remote_dir_recur(remotepath, proceed, remotepath, args, skip_remote_only_dirs)
 
-	def __prepare_local_dir(self, localdir):
+	def ___prepare_local_dir(self, localdir):
 		result = ENoError
 		if os.path.isfile(localdir):
 			result = removefile(localdir, self.verbose)
@@ -3362,11 +3362,14 @@ restore a file from the recycle bin
 	def __proceed_local_gather(self, dirlen, walk):
 		#names.sort()
 		(dirpath, dirnames, filenames) = walk
-
+		if  "@" in dirpath:
+			return ENoError
 		files = []
 		for name in filenames:
 			#fullname = os.path.join(dirpath, name)
 			fullname = joinpath(dirpath, name)
+			if '@' in fullname:
+				continue
 			# ignore broken symbolic links
 			if not os.path.exists(fullname):
 				self.pd("Local path '{}' does not exist (broken symbolic link?)".format(fullname))
@@ -3376,7 +3379,8 @@ restore a file from the recycle bin
 		reldir = dirpath[dirlen:].replace('\\', '/')
 		place = self.__local_dir_contents.get(reldir)
 		for dir in dirnames:
-			place.add(dir, PathDictTree('D'))
+			if '@' not in dir:
+				place.add(dir, PathDictTree('D'))
 		for file in files:
 			place.add(file[0], PathDictTree('F', size = file[1], md5 = file[2]))
 
