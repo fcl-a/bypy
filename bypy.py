@@ -3369,10 +3369,10 @@ restore a file from the recycle bin
 		if self.__exclude_wildcard != None:
 			dirs = path.split('/')
 			for dir in dirs:
-			dirs = path.split('/')
-			for dir in dirs:
 				for re_obj in self.__exclude_reobjs:
 					if re_obj.match(path):
+# 				for wildcard in self.__exclude_wildcard:
+# 					if fnmatch.fnmatch(path,wildcard):
 						return True
 		return False
 
@@ -3406,7 +3406,7 @@ restore a file from the recycle bin
 		return ENoError
 
 	def __gather_local_dir(self, dir):
-		print ("exclude:%s"%(self.__exclude_wildcard))
+		print ("exclude:%s"%self.__exclude_wildcard)
 		self.__local_dir_contents = PathDictTree()
 		#for walk in os.walk(dir, followlinks=self.__followlink):
 		for walk in self.__walk_normal_file(dir):
