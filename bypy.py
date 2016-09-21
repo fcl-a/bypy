@@ -1465,6 +1465,11 @@ class ByPy(object):
 		self.__incregex = incregex
 		self.__incregmo = re.compile(incregex)
 		self.__exclude_wildcard = exclude_wildcard
+		self.__exclude_reobjs = []
+		if (self.__exclude_wildcard != None):
+			for item in exclude_wildcard:
+				self.__exclude_reobjs.append( re.compile(fnmatch.translate(item)))
+
 		if ondup and len(ondup) > 0:
 			self.__ondup = ondup[0].upper()
 		else:
@@ -3362,8 +3367,8 @@ restore a file from the recycle bin
 
 	def __is_excluded(self, path):
 		if self.__exclude_wildcard != None:
-			for wildcard in self.__exclude_wildcard:
-				if fnmatch.fnmatch(path, wildcard):
+			for re_obj in self.__exclude_reobjs:
+				if re_obj.match(path):
 					return True
 		return False
 
@@ -3420,7 +3425,7 @@ restore a file from the recycle bin
 
 	def __gather_remote_dir(self, rdir, skip_remote_only_dirs = False):
 		self.__remote_dir_contents = PathDictTree()
-		self.__walk_remote_dir(rdir, self.__proceed_remote_gather, rdir, skip_remote_only_dirs)
+# 		self.__walk_remote_dir(rdir, self.__proceed_remote_gather, rdir, skip_remote_only_dirs)
 		self.pd("---- Remote Dir Contents ---")
 		self.pd(self.__remote_dir_contents)
 
