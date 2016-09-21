@@ -3367,9 +3367,11 @@ restore a file from the recycle bin
 
 	def __is_excluded(self, path):
 		if self.__exclude_wildcard != None:
-			for re_obj in self.__exclude_reobjs:
-				if re_obj.match(path):
-					return True
+			dirs = path.split('/')
+			for dir in dirs:
+				for re_obj in self.__exclude_reobjs:
+					if re_obj.match(path):
+						return True
 		return False
 
 	def __proceed_local_gather(self, dirlen, walk):
@@ -3377,6 +3379,7 @@ restore a file from the recycle bin
 		(dirpath, dirnames, filenames) = walk
 		if self.__is_excluded(dirpath[dirlen + 1:].replace('\\', '/')):
 			return ENoError
+		print ('scan dir:%s,%s'%(dirpath, dirpath[dirlen + 1:]))
 		files = []
 		for name in filenames:
 			#fullname = os.path.join(dirpath, name)
@@ -3401,6 +3404,7 @@ restore a file from the recycle bin
 		return ENoError
 
 	def __gather_local_dir(self, dir):
+		print ("exclude:%s"%(self.__exclude_wildcard))
 		self.__local_dir_contents = PathDictTree()
 		#for walk in os.walk(dir, followlinks=self.__followlink):
 		for walk in self.__walk_normal_file(dir):
