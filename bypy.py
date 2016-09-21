@@ -3369,6 +3369,8 @@ restore a file from the recycle bin
 		if self.__exclude_wildcard != None:
 			dirs = path.split('/')
 			for dir in dirs:
+			dirs = path.split('/')
+			for dir in dirs:
 				for re_obj in self.__exclude_reobjs:
 					if re_obj.match(path):
 						return True
