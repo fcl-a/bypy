@@ -3370,7 +3370,7 @@ restore a file from the recycle bin
 			dirs = path.split('/')
 			for dir in dirs:
 				for re_obj in self.__exclude_reobjs:
-					if re_obj.match(path):
+					if re_obj.match(dir):
 # 				for wildcard in self.__exclude_wildcard:
 # 					if fnmatch.fnmatch(path,wildcard):
 						return True
@@ -3381,7 +3381,7 @@ restore a file from the recycle bin
 		(dirpath, dirnames, filenames) = walk
 		if self.__is_excluded(dirpath[dirlen + 1:].replace('\\', '/')):
 			return ENoError
-		print ('scan dir:%s,%s'%(dirpath, dirpath[dirlen + 1:]))
+# 		print ('scan dir:%s,%s'%(dirpath, dirpath[dirlen + 1:]))
 		files = []
 		for name in filenames:
 			#fullname = os.path.join(dirpath, name)
@@ -3431,7 +3431,7 @@ restore a file from the recycle bin
 
 	def __gather_remote_dir(self, rdir, skip_remote_only_dirs = False):
 		self.__remote_dir_contents = PathDictTree()
-# 		self.__walk_remote_dir(rdir, self.__proceed_remote_gather, rdir, skip_remote_only_dirs)
+ 		self.__walk_remote_dir(rdir, self.__proceed_remote_gather, rdir, skip_remote_only_dirs)
 		self.pd("---- Remote Dir Contents ---")
 		self.pd(self.__remote_dir_contents)
 
