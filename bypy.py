@@ -308,7 +308,9 @@ HelpMarker = "Usage:"
 
 ### ByPy config constants
 ## directories, for setting, cache, etc
-HomeDir = expanduser('~')
+HomeDir = os.getenv('BYPY_HOME','')
+if HomeDir == "" :
+ 	HomeDir = expanduser('~')
 # os.path.join() may not handle unicode well
 ConfigDir = HomeDir + os.sep + '.bypy'
 TokenFileName = 'bypy.json'
