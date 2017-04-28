@@ -6,129 +6,34 @@
 # Licensed under the GPLv3
 # https://www.gnu.org/licenses/gpl-3.0.txt
 
+# from __future__ imports must occur at the beginning of the file
+from __future__ import unicode_literals
+from __future__ import print_function
 from __future__ import division
+
 import sys
 import threading
 
 vi = sys.version_info
 if vi[0] == 2:
-	import ScrolledText as scrt
 	import Tkinter as tk
 	import tkFileDialog
 	import tkMessageBox
 	import ttk
 elif vi[0] == 3:
-	from tkinter import scrolledtext as scrt
 	import tkinter as tk
 	from tkinter import filedialog as tkFileDialog, messagebox as tkMessageBox, ttk
 
-MyReadOnlyText = tk.Text
-MyLogText = scrt.ScrolledText
-try:
-# https://stackoverflow.com/questions/3842155/is-there-a-way-to-make-the-tkinter-text-widget-read-only
-	from idlelib.WidgetRedirector import WidgetRedirector
-
-	class ReadOnlyText(tk.Text):
-		def __init__(self, *args, **kwargs):
-			tk.Text.__init__(self, *args, **kwargs)
-			self.redirector = WidgetRedirector(self)
-			self.insert = self.redirector.register("insert", lambda *args, **kw: "break")
-			self.delete = self.redirector.register("delete", lambda *args, **kw: "break")
-
-	class ReadOnlyScrolledText(scrt.ScrolledText):
-		def __init__(self, *args, **kwargs):
-			scrt.ScrolledText.__init__(self, *args, **kwargs)
-			self.redirector = WidgetRedirector(self)
-			self.insert = self.redirector.register("insert", lambda *args, **kw: "break")
-			self.delete = self.redirector.register("delete", lambda *args, **kw: "break")
-
-	MyReadOnlyText = ReadOnlyText
-	MyLogText = ReadOnlyScrolledText
-except:
-	# it's OK, we just ignore it
-	pass
-
-import bypy
-
-Stretch = tk.N+tk.E+tk.S+tk.W
-GridStyle = { 'padx' : 0, 'pady' : 0 }
+from . import const
+from . import monkey
+from .util import (get_pcs_path)
+from .tkutil import (
+	ColorMap, fgtag, bgtag,
+	Stretch, GridStyle, MyLogText,
+	centerwindow)
+from .bypy import ByPy
 
 GuiTitle = "Bypy GUI"
-
-ColorMap = {
-	bypy.TermColor.Black: "black",
-	bypy.TermColor.Red: "red",
-	bypy.TermColor.Green: "green",
-	bypy.TermColor.Yellow: "yellow",
-	bypy.TermColor.Blue: "blue",
-	bypy.TermColor.Magenta: "magenta",
-	bypy.TermColor.Cyan: "cyan",
-	bypy.TermColor.White: "white" }
-
-def centerwindow(w):
-	w.update() # fucking bit me
-	sw, sh = w.winfo_screenwidth(), w.winfo_screenheight()
-	width, height = w.winfo_width(), w.winfo_height()
-	x = (sw - width) // 2
-	y = (sh - height) // 2
-	w.geometry('{}x{}+{}+{}'.format(width, height, x, y))
-
-def fgtag(text):
-	return 'FG' + text
-
-def bgtag(text):
-	return 'BG' + text
-
-class NewThread(threading.Thread):
-	def __init__(self, func):
-		threading.Thread.__init__(self)
-		self.func = func
-
-	def run(self):
-		self.func()
-
-def startthread(func):
-	NewThread(func).start()
-
-class AskGui(tk.Toplevel):
-	def __init__(self, master = None,
-			message = "",
-			title = GuiTitle):
-		tk.Toplevel.__init__(self, master)
-
-		self.message = message
-		self.input = ''
-
-		self.transient(master)
-		self.master = master
-		if title:
-			self.title(title)
-
-		self.CreateWidgets()
-		self.grab_set()
-
-	def End(self, event):
-		self.input = self.wInput.get()
-		self.master.focus_set()
-		self.destroy()
-
-	def CreateWidgets(self):
-		self.grid_columnconfigure(0, weight = 1)
-		self.grid_rowconfigure(0, weight = 1)
-		self.wMessage = MyReadOnlyText(self, height = 8, bg = 'wheat')
-		self.wMessage.insert(tk.END, self.message + '\n')
-		self.wMessage.insert(tk.END, 'Press [OK] when you are done\n')
-		self.wMessage.grid(sticky = Stretch, **GridStyle)
-		self.wInput = tk.Entry(self, width = 100)
-		self.wInput.grid(row = 1, column = 0, sticky = tk.E + tk.W, **GridStyle)
-		self.wInput.bind('<Return>', self.End)
-		self.wOK = tk.Button(self, text = 'OK', default = tk.ACTIVE)
-		self.wOK.grid(row = 2, column = 0, sticky = Stretch, **GridStyle)
-		self.wOK.bind('<Button-1>', self.End)
-
-		self.wInput.focus_set()
-
-		self.protocol("WM_DELETE_WINDOW", lambda: ())
 
 class RemoteListGui(tk.Toplevel):
 	# remotepath is the partial path,
@@ -137,7 +42,7 @@ class RemoteListGui(tk.Toplevel):
 		tk.Toplevel.__init__(self, master)
 
 		self.byp = byp
-		self.rpath = bypy.get_pcs_path(remotepath)
+		self.rpath = get_pcs_path(remotepath)
 		self.result = ''
 
 		self.transient(master)
@@ -153,7 +58,7 @@ class RemoteListGui(tk.Toplevel):
 
 	def GetRemoteAct(self, r, args):
 		self.wList.delete(0, tk.END)
-		if self.rpath.strip('/') != bypy.AppPcsPath.strip('/'):
+		if self.rpath.strip('/') != const.AppPcsPath.strip('/'):
 			self.wList.insert(tk.END, '..')
 		try:
 			j = r.json()
@@ -163,9 +68,9 @@ class RemoteListGui(tk.Toplevel):
 				self.wList.insert(tk.END,
 					relpath + '/' if f['isdir'] else relpath)
 
-			return bypy.ENoError
+			return const.ENoError
 		except:
-			return bypy.EException
+			return const.EException
 
 	def GetRemote(self):
 		pars = {
@@ -175,12 +80,12 @@ class RemoteListGui(tk.Toplevel):
 			'order' : 'asc' }
 
 		result = self.byp._ByPy__get(
-			bypy.PcsUrl + 'file', pars, self.GetRemoteAct)
+			const.PcsUrl + 'file', pars, self.GetRemoteAct)
 
-		if result == bypy.ENoError:
+		if result == const.ENoError:
 			self.title(self.rpath)
 		else:
-			if self.rpath.strip('/') == bypy.AppPcsPath.strip('/'):
+			if self.rpath.strip('/') == const.AppPcsPath.strip('/'):
 				err = "Can't retrieve Baidu PCS directories!\n" + \
 					"Maybe the network is down?\n" + \
 					"You can still manually input the remote path though" + \
@@ -188,7 +93,7 @@ class RemoteListGui(tk.Toplevel):
 				tkMessageBox.showerror(GuiTitle, err)
 				self.Bye()
 			else:
-				self.rpath = bypy.get_pcs_path('')
+				self.rpath = const.get_pcs_path('')
 				self.GetRemote()
 
 	def Bye(self, result = ''):
@@ -203,7 +108,7 @@ class RemoteListGui(tk.Toplevel):
 			parent = self):
 			rpath = '/'.join([self.rpath, selected])
 			r = self.byp._ByPy__delete(rpath)
-			if r == bypy.ENoError:
+			if r == const.ENoError:
 				self.wList.delete(tk.ANCHOR)
 			else:
 				tkMessageBox.showerror(
@@ -213,7 +118,7 @@ class RemoteListGui(tk.Toplevel):
 
 	def Select(self, event):
 		if event.widget == self.wOK:
-			self.Bye(self.rpath[len(bypy.AppPcsPath):])
+			self.Bye(self.rpath[len(const.AppPcsPath):])
 		elif event.widget == self.wList:
 			selected = ''
 			iet = int(event.type) # i don't know why, but it seems needed
@@ -231,7 +136,7 @@ class RemoteListGui(tk.Toplevel):
 					self.rpath = '/'.join(self.rpath.split('/')[:-1])
 					self.GetRemote()
 				else:
-					self.Bye('/'.join([self.rpath, selected])[len(bypy.AppPcsPath):])
+					self.Bye('/'.join([self.rpath, selected])[len(const.AppPcsPath):])
 			elif iet == 2 and event.keysym == 'Delete':
 				# don't handlle this, not so rational usage
 				if selected != '..':
@@ -259,25 +164,6 @@ class BypyGui(tk.Frame):
 	# pr and prcolor functions in console and GUI are different:
 	#   in console: pr is the foundamental function, prcolor calls it
 	#   in GUI: prcolor is the foundamental fucntion, pr calls it
-	def prcolorg(self, msg, fg, bg):
-		if self.bLog.get() != 0:
-			self.wLog.insert(tk.END, msg + '\n',
-				(fgtag(ColorMap[fg]) if fg in ColorMap else fgtag(''),
-					bgtag(ColorMap[bg]) if bg in ColorMap else bgtag('')))
-
-	def prg(self, msg):
-		return self.prcolorg(msg, bypy.TermColor.Nil, bypy.TermColor.Nil)
-
-	def pprgrg(self, finish, total, start_time= None, existing = 0,
-			prefix = '', suffix = '', seg = 1000):
-		self.progress.set(self.maxProgress * (finish - existing) // total)
-
-	def askg(self, message = "Please input", enter = True, title = GuiTitle):
-		asker = AskGui(self, message, title)
-		centerwindow(asker)
-		asker.wait_window(asker)
-		return asker.input
-
 	def __init__(self, master = None):
 		tk.Frame.__init__(self, master)
 
@@ -301,10 +187,7 @@ class BypyGui(tk.Frame):
 
 		self.CreateWidgets()
 
-		bypy.pr = self.prg
-		bypy.prcolor = self.prcolorg
-		bypy.pprgr = self.pprgrg
-		bypy.ask = self.askg
+		monkey.setgui(self)
 
 		self.initbypy()
 
@@ -314,7 +197,7 @@ class BypyGui(tk.Frame):
 		self.grid_columnconfigure(1, weight = 1)
 		self.grid_rowconfigure(4, weight = 1)
 
-		z = tk.Label(self, text = 'Baidu: ' + bypy.AppPcsPath)
+		z = tk.Label(self, text = 'Baidu: ' + const.AppPcsPath)
 		z.grid(row = 0, column = 0, **GridStyle)
 		self.wRemotePath = tk.Entry(self, textvariable = self.remotePath)
 		self.wRemotePath.grid(row = 0, column = 1, sticky = Stretch, **GridStyle)
@@ -396,7 +279,7 @@ class BypyGui(tk.Frame):
 		centerwindow(self.master)
 
 	def initbypy(self):
-		self.byp = bypy.ByPy(verbose = 1)
+		self.byp = ByPy(verbose = 1)
 
 	def selectlocalpath(self, *args):
 		self.localPath.set(

@@ -1,5 +1,21 @@
 ### Version History:
 
+- 1.4.3: Fix __server_auth()
+- 1.4.2: Add bypy version in getting and refresshing token requests for finer control
+- 1.4.1: Fix a severe bug in token refreshing
+- 1.4.0: Correct Refresh server list; Add in update check
+
+- 1.3.9: Add in queue for capturing JSONs returned from PCS
+- 1.3.8: Don't output Auth Server failures if no `-d` specified
+- 1.3.7: Allow passing leading dash arguments to downloader
+- 1.3.6: Fix downdir downloads to a wrong directory structure
+- 1.3.5: Fix aria2 unable to resume download
+- 1.3.4: Add --select-fastest-mirror, --config-dir command line arguments; Switch to wheel dist format
+- 1.3.3: Fix the upload failure when slices expired
+- 1.3.2: Enable SSL check by default now
+- 1.3.1: Fix setup.py failures
+- 1.3.0: Major change: Make bypy a real Python package
+
 - 1.2.22: Fix "TypeError: b'xxxxxx' is not JSON serializable" for cache
 - 1.2.21: Support aria2 downloading resuming (disable preallocation)
 - 1.2.20: Fix an error in upload resuming; Add in retries for aria2

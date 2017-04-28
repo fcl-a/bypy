@@ -39,7 +39,13 @@ nosetests.xml
 .pydevproject
 
 ### personal
+# setuptools cache
+.eggs
 *.swp
 ## PyCharm
 #.idea/
 #.idea/workspace.xml
+#*.rst
+bypy/test/**/*.bin
+bypy/test/downdir/
+bypy/test/sharedir/

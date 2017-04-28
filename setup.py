@@ -1,36 +1,64 @@
 #!/usr/bin/env python
 # coding=utf-8
 
-from setuptools import setup,find_packages
+import io
+import re
 
-# TODO: make the install clean
-import bypy
-doclist = bypy.__doc__.split("---")
-long_desc = doclist[1].strip() + '\n\n'
-try:
-	import pypandoc
-	long_desc += pypandoc.convert('HISTORY.md', 'rst')
-except Exception as ex:
-	print("Error: PanDoc not found\n{}".format(ex))
-	with open('HISTORY.md') as f:
-		long_desc += f.read()
+from setuptools import setup
 
-print(long_desc)
+# https://packaging.python.org/single_source_version/
+# CAN'T believe there is no single *clean* way of retrieving the version.
+def getmeta(path, encoding = 'utf8'):
+	with io.open(path, encoding = encoding) as fp:
+		content = fp.read()
+	metakeys = ['title', 'version', 'desc', 'author', 'license', 'url']
+	metatrans = { 'title' : 'name', 'desc' : 'description' }
+	meta = {}
+	for mk in metakeys:
+		match = re.search(
+			r"^__" + mk + r"__\s*=\s*['\"]([^'\"]*)['\"]",
+            content, re.M)
+		if match:
+			if mk in metatrans:
+				key = metatrans[mk]
+			else:
+				key = mk
+			meta[key] = match.group(1)
+		else:
+			raise RuntimeError("Unable to find meta key: {}".format(mk))
+	return meta
+
+meta = getmeta('bypy/const.py')
+
+long_desc = '''\
+Documents:
+~~~~~~~~~~
+See: https://github.com/houtianze/bypy
+
+
+'''
+
+with open('HISTORY.rst') as f:
+	long_desc += f.read()
 
 setup(
-	name='bypy',
-	version=bypy.__version__,
-	description='Python client for Baidu Yun (Personal Cloud Storage) 百度云/百度网盘 Python 客户端',
 	long_description=long_desc,
-	author='Hou Tianze',
-	license='MIT',
-	url='https://github.com/houtianze/bypy',
-	download_url='https://github.com/houtianze/bypy/tarball/' + bypy.__version__,
-	packages=find_packages(),
-	scripts=['bypy', 'bypy.bat', 'bypy.py', 'bypygui.pyw'],
+	author_email = 'houtianze@users.noreply.github.com',
+	download_url = 'https://github.com/houtianze/bypy/tarball/' + meta['version'],
+	#packages=find_packages(),
+	packages = ['bypy', 'bypy.test'],
 	package_data = {
-		'' : ['*.md']
+		'bypy' : ['*.rst', 'bypy/*.pem']
 	},
+	entry_points = {
+		'console_scripts': [
+			'bypy = bypy.bypy:main'
+		],
+		'gui_scripts': [
+			'bypygui = bypy.gui:main'
+		]
+	},
+	test_suite = 'bypy.test',
 	keywords = ['bypy', 'bypy.py', 'baidu pcs', 'baidu yun', 'baidu pan', 'baidu netdisk',
 				'baidu cloud storage', 'baidu personal cloud storage',
 				'百度云', '百度云盘', '百度网盘', '百度个人云存储'],
@@ -49,9 +77,9 @@ setup(
 		'Programming Language :: Python',
 		'Topic :: Utilities',
 		'Topic :: Internet :: WWW/HTTP'],
-	install_requires = [
-		'requests',
-	],
-	include_package_data=True)
+	install_requires = ['requests>=2.10.0'],
+	include_package_data = True,
+	**meta
+)
 
 # vim: tabstop=4 noexpandtab shiftwidth=4 softtabstop=4 ff=unix fileencoding=utf-8
