@@ -1,3 +1,4 @@
 eclipse.preferences.version=1
-encoding/bypy.py=utf-8
+encoding//bypy/bypy.py=utf-8
+encoding//bypy/const.py=utf-8
 encoding/setup.py=utf-8
