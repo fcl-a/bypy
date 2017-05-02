@@ -2332,6 +2332,8 @@ restore a file from the recycle bin
 
 		reldir = dirpath[dirlen:].replace('\\', '/')
 		place = self.__local_dir_contents.get(reldir)
+		if place == None:
+			return const.ENoError
 		for dir in dirnames:
 			if self.__is_excluded(dir) == False:
 				place.add(dir, PathDictTree('D'))
