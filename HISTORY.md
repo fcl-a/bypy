@@ -1,5 +1,25 @@
 ### Version History:
 
+- 1.6.3: Change default timeout to 5 minutes
+- 1.6.2: Properly handle (treat it as no error) error_code 31061 (file already exists) from PCS
+- 1.6.1: Ensure cache loading/saving failures won't affect normal operations; Fix the bug that clean up code not called on exit
+- 1.6.0: Fix 1000 items limit for remote directory listing
+- 1.5.13: Fix multiprocess upload/syncup missing some files
+- 1.5.12: Add one more heroku server; Workaround "ValueError: unknown locale: UTF-8" on macOs (by xslidian)
+- 1.5.11: Fix typo near version string
+- 1.5.10: Print the error code if the action failed
+- 1.5.9: Migrate the OpenShift auth server
+- 1.5.8: Add `--move` flag to delete source files/directories on successfull transfers
+- 1.5.7: Reduce multiprocess timeout to 49 days, to accommodate Python 3 on Windows
+- 1.5.6: Downloading using downloader also retries
+- 1.5.5: Minor: Improve 'multiprocess' installation prompts
+- 1.5.4: Print instructions on how to fix 'multiprocess' errors
+- 1.5.3: Change to streaming upload
+- 1.5.2: Defuse the circular import bomb brought in the previous version...
+- 1.5.1: Improve multiprocess (and fix filter() for Python3)
+- 1.5.0: Multi-Process for directory download / upload / sync up/down
+
+- 1.4.4: Aria2 download works even file names contain single quote (')
 - 1.4.3: Fix __server_auth()
 - 1.4.2: Add bypy version in getting and refresshing token requests for finer control
 - 1.4.1: Fix a severe bug in token refreshing

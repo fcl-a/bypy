@@ -2,8 +2,8 @@
 # encoding: utf-8
 # PYTHON_ARGCOMPLETE_OK
 
-from functools import partial
 import sys
+from functools import partial
 
 from . import printer_console
 from . import bypy

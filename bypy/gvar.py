@@ -12,7 +12,18 @@ import time
 from . import const
 
 ## global variables
-SystemLanguageCode, SystemEncoding = locale.getdefaultlocale()
+try:
+	SystemLanguageCode, SystemEncoding = locale.getdefaultlocale()
+except ValueError as e:
+	# https://coderwall.com/p/-k_93g/mac-os-x-valueerror-unknown-locale-utf-8-in-python
+	# Mac OS X: ValueError: unknown locale: UTF-8 in Python
+	# Proper fix:
+	# export LC_ALL=en_US.UTF-8
+	# export LANG=en_US.UTF-8
+	if e.args and e.args[0] and e.args[0] == "unknown locale: UTF-8":
+		SystemLanguageCode, SystemEncoding = '', 'UTF-8'
+	else:
+		raise
 # the previous time stdout was flushed, maybe we just flush every time, or maybe this way performs better
 # http://stackoverflow.com/questions/230751/how-to-flush-output-of-python-print
 last_stdout_flush = time.time()

@@ -20,7 +20,8 @@ from .util import (
 	pdbg, pinfo, perr,
 	getfilesize, getfilemtime_int,
 	joinpath, formatex,
-	jsonload, jsondump)
+	jsonload, jsondump,
+	removepath)
 
 pr = util.pr
 
@@ -120,10 +121,10 @@ class cached(object):
 		# periodically save to prevent loss in case of system crash
 		now = time.time()
 		if now - gvar.last_cache_save >= const.CacheSavePeriodInSec:
+			if cached.debug:
+				pdbg("Periodically saving Hash Cash")
 			cached.savecache()
 			gvar.last_cache_save = now
-		if cached.debug:
-			pdbg("Periodically saving Hash Cash")
 
 	# merge the from 'fromc' cache into the 'to' cache.
 	# 'keepto':
@@ -196,7 +197,8 @@ class cached(object):
 					cached.cacheloaded = True
 					if cached.verbose:
 						pr("Hash Cache File loaded.")
-				except (EOFError, TypeError, ValueError) as ex:
+				#except (EOFError, TypeError, ValueError, UnicodeDecodeError) as ex:
+				except Exception as ex:
 					perr("Fail to load the Hash Cache, no caching.\n{}".format(formatex(ex)))
 					cached.cache = existingcache
 			else:
@@ -257,6 +259,32 @@ class cached(object):
 						cached.cache[absdir] = files
 		cached.savecache()
 
+	@staticmethod
+	def remove(path):
+		def notfound():
+			pdbg("Failed to delete cache: Path '{}' not found in cache.".format(path))
+
+		dir, file = os.path.split(path)
+		absdir = os.path.abspath(dir)
+		if absdir in cached.cache:
+			entry = cached.cache[absdir]
+			if file in entry:
+				del entry[file]
+				pdbg("Cache for '{}' removed.".format(path))
+				if not entry:
+					del cached.cache[absdir]
+					pdbg("Empty directory '{}' in cache also removed.".format(absdir))
+			else:
+				notfound()
+		else:
+			notfound()
+
+	@staticmethod
+	def remove_path_and_cache(path):
+		result = removepath(path)
+		if result == const.ENoError and os.path.isfile(path):
+			cached.remove(path)
+		return result
 
 @cached
 def md5(filename, slice = const.OneM):

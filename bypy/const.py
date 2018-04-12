@@ -12,10 +12,10 @@ import os
 
 # https://packaging.python.org/single_source_version/
 __title__ = 'bypy'
-__version__ = '1.4.3'
+__version__ = '1.6.3'
 __author__ = 'Hou Tianze'
 __license__ = 'MIT'
-__desc__ ='Python client for Baidu Yun (Personal Cloud Storage) 百度云/百度网盘 Python 客户端'
+__desc__ = 'Python client for Baidu Yun (Personal Cloud Storage) 百度云/百度网盘 Python 客户端'
 __url__ = 'https://github.com/houtianze/bypy'
 
 ### return (error) codes
@@ -45,6 +45,7 @@ EMigrationFailed = 170
 EDownloadCerts = 180
 EUserRejected = 190 # user's decision
 EUpdateNeeded = 200
+ESkipped = 210
 EFatal = -1 # No way to continue
 # internal errors
 IEMD5NotFound = 31079 # File md5 not found, you should use upload API to upload the whole file.
@@ -52,6 +53,42 @@ IESuperfileCreationFailed = 31081 # superfile create failed (HTTP 404)
 # Undocumented, see #308 , https://paste.ubuntu.com/23672323/
 IEBlockMissInSuperFile2 = 31363 # block miss in superfile2 (HTTP 403)
 IETaskNotFound = 36016 # Task was not found
+IEFileAlreadyExists = 31061 # {"error_code":31061,"error_msg":"file already exists","request_id":2939656146461714799}
+
+# TODO: Should have use an enum or some sort of data structure for this,
+# but now changing this is too time consuming and error-prone
+ErrorExplanations = {
+	ENoError: "Everything went fine.",
+	EIncorrectPythonVersion: "Incorrect Python version",
+	EArgument: "Invalid program argument passed in",
+	EAbort: "Abort due to unrecovrable errors",
+	EException: "Unhandled exception occurred",
+	EParameter: "Some or all the parameters passed to the function are invalid",
+	EInvalidJson: "Invalid JSON received",
+	EHashMismatch: "MD5 hashes of the local file and remote file don't match each other",
+	EFileWrite: "Error writing file",
+	EFileTooBig: "File too big to upload",
+	EFailToCreateLocalDir: "Unable to create some directory(ies)",
+	EFailToCreateLocalFile: "Unable to create some local file(s)",
+	EFailToDeleteDir:" Unable to delete some directory(ies)",
+	EFailToDeleteFile: "Unable to delete some file(s)",
+	EFileNotFound: "File not found",
+	EMaxRetry: "Maximum retries reached",
+	ERequestFailed: "Request failed",
+	ECacheNotLoaded: "Failed to load file caches",
+	EMigrationFailed: "Failed to migrate from the old cache format",
+	EDownloadCerts: "Failed to download certificats", # no long in use
+	EUserRejected: "User chose to not to proceed",
+	EUpdateNeeded: "Need to update bypy",
+	ESkipped: "Some files/directores are skipped",
+	EFatal: "Fatal error, unable to continue",
+	IEMD5NotFound: "File md5 not found, you should use upload API to upload the whole file.",
+	IESuperfileCreationFailed: "superfile create failed (HTTP 404)",
+	# Undocumented, see #308 , https://paste.ubuntu.com/23672323/
+	IEBlockMissInSuperFile2: "Block miss in superfile2 (HTTP 403)",
+	IETaskNotFound: "Task was not found",
+	IEFileAlreadyExists: "File already exists"
+}
 
 DownloaderAria2 = 'aria2'
 Downloaders = [DownloaderAria2]
@@ -85,6 +122,13 @@ SIPrefixTimes = {
 	'Z' : OneZ,
 	'Y' : OneY }
 
+# before this, you don't know me, i don't know you - Eason
+TenYearInSeconds = 60 * 60 * 24 * 366 * 10
+# For Python 3 only, threading.TIMEOUT_MAX is 9223372036854.0 on all *nix systems,
+# but it's a little over 49 days for Windows, if we give a value larger than that,
+# Python 3 on Windows will throw towel, so we cringe.
+FortyNineDaysInSeconds = 60 * 60 * 24 * 49
+
 #### Baidu PCS constants
 # ==== NOTE ====
 # I use server auth, because it's the only possible method to protect the SecretKey.
@@ -115,28 +159,35 @@ DPcsUrl = 'https://d.pcs.baidu.com/rest/2.0/pcs/'
 MinRapidUploadFileSize = 256 * OneK
 MaxSliceSize = 2 * OneG
 MaxSlicePieces = 1024
+MaxListEntries = 1000 # https://github.com/houtianze/bypy/issues/285
 
 ### Auth servers
 GaeUrl = 'https://bypyoauth.appspot.com'
-OpenShiftUrl = 'https://bypy-tianze.rhcloud.com'
+#OpenShiftUrl = 'https://bypy-tianze.rhcloud.com'
+OpenShiftUrl = 'https://bypyoauth-route-bypy.a3c1.starter-us-west-1.openshiftapps.com'
 HerokuUrl = 'https://bypyoauth.herokuapp.com'
+Heroku1Url = 'https://bypyoauth1.herokuapp.com'
 GaeRedirectUrl = GaeUrl + '/auth'
 GaeRefreshUrl = GaeUrl + '/refresh'
 OpenShiftRedirectUrl = OpenShiftUrl + '/auth'
 OpenShiftRefreshUrl = OpenShiftUrl + '/refresh'
 HerokuRedirectUrl = HerokuUrl + '/auth'
 HerokuRefreshUrl = HerokuUrl + '/refresh'
+Heroku1RedirectUrl = Heroku1Url + '/auth'
+Heroku1RefreshUrl = Heroku1Url + '/refresh'
 AuthServerList = [
 	# url, rety?, message
 	(OpenShiftRedirectUrl, False, "Authorizing/refreshing with the OpenShift server ..."),
-	(HerokuRedirectUrl, True, "OpenShift server failed, authorizing/refreshing with the Heroku server ..."),
-	(GaeRedirectUrl, False, "Heroku server failed. Last resort: authorizing/refreshing with the GAE server ..."),
+	(HerokuRedirectUrl, False, "OpenShift server failed, authorizing/refreshing with the Heroku server ..."),
+	(Heroku1RedirectUrl, False, "Heroku server failed, authorizing/refreshing with the Heroku1 server ..."),
+	(GaeRedirectUrl, False, "Heroku1 server failed. Last resort: authorizing/refreshing with the GAE server ..."),
 ]
 RefreshServerList = [
 	# url, rety?, message
 	(OpenShiftRefreshUrl, False, "Authorizing/refreshing with the OpenShift server ..."),
-	(HerokuRefreshUrl, True, "OpenShift server failed, authorizing/refreshing with the Heroku server ..."),
-	(GaeRefreshUrl, False, "Heroku server failed. Last resort: authorizing/refreshing with the GAE server ..."),
+	(HerokuRefreshUrl, False, "OpenShift server failed, authorizing/refreshing with the Heroku server ..."),
+	(Heroku1RefreshUrl, False, "Heroku server failed, authorizing/refreshing with the Heroku1 server ..."),
+	(GaeRefreshUrl, False, "Heroku1 server failed. Last resort: authorizing/refreshing with the GAE server ..."),
 ]
 
 ### public static properties
@@ -146,13 +197,13 @@ HelpMarker = "Usage:"
 ## directories, for setting, cache, etc
 HomeDir = os.getenv('BYPY_HOME','')
 if HomeDir == "" :
- 	HomeDir = expanduser('~')
+ 	HomeDir = os.path.expanduser('~')
 # os.path.join() may not handle unicode well
 ConfigDir = HomeDir + os.sep + '.bypy'
 TokenFileName = 'bypy.json'
 TokenFilePath = ConfigDir + os.sep + TokenFileName
-SettingFileName= 'bypy.setting.json'
-SettingFilePath= ConfigDir + os.sep + SettingFileName
+SettingFileName = 'bypy.setting.json'
+SettingFilePath = ConfigDir + os.sep + SettingFileName
 HashCacheFileName = 'bypy.hashcache.json'
 HashCachePath = ConfigDir + os.sep + HashCacheFileName
 PickleFileName = 'bypy.pickle'
@@ -186,14 +237,17 @@ DefaultSliceSize = 20 * OneM
 DefaultDlChunkSize = 20 * OneM
 RetryDelayInSec = 10
 CacheSavePeriodInSec = 10 * 60.0
+DefaultTimeOutInSeconds=300
 # share retries
 ShareRapidUploadRetries = 3
 DefaultResumeDlRevertCount = 1
+DefaultProcessCount = 1
 
 ## program switches
-CleanOptionShort= '-c'
-CleanOptionLong= '--clean'
+CleanOptionShort = '-c'
+CleanOptionLong = '--clean'
 DisableSslCheckOption = '--disable-ssl-check'
 CaCertsOption = '--cacerts'
+MultiprocessOption = '--processes'
 
 # vim: tabstop=4 noexpandtab shiftwidth=4 softtabstop=4 ff=unix fileencoding=utf-8
