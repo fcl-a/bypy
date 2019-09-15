@@ -49,6 +49,7 @@ import pprint
 import socket
 import subprocess
 import shlex
+import atexit
 from collections import deque
 #from collections import OrderedDict
 from functools import partial
@@ -136,9 +137,6 @@ if Pool != None:
 			yield Pool(*args, **kwargs)
 	elif sys.version_info[0] == 3:
 		UPool = Pool
-
-# global instance for non-member function to access
-gbypyinst = None
 
 pcsurl = const.PcsUrl
 cpcsurl = const.CPcsUrl
@@ -270,7 +268,8 @@ class ByPy(object):
 			perr("Failed to save settings.\n{}".format(formatex(ex)))
 			# complaining is enough, no need more actions as this is non-critical
 
-	def quit(self, retcode = const.ENoError):
+	# def quit(self, retcode = const.ENoError):
+	def cleanup(self):
 		# saving is the most important
 		# we save, but don't clean, why?
 		# think about unmount path, moved files,
@@ -283,7 +282,7 @@ class ByPy(object):
 		# if we flush() on Ctrl-C, we get
 		# IOError: [Errno 32] Broken pipe
 		sys.stdout.flush()
-		sys.exit(retcode)
+		# sys.exit(retcode)
 
 	# TODO: this constructor is getting fat ...
 	def __init__(self,
@@ -313,20 +312,22 @@ class ByPy(object):
 		downloader_args = "",
 		processes = const.DefaultProcessCount,
 		secretkey = const.SecretKey):
-
 		super(ByPy, self).__init__()
 		self.jsonq = deque(maxlen = 64)
 
-		# declaration of myself
-		global gbypyinst
-		gbypyinst = self
+		# these two variables are without leading double underscore "__" as to export the as public,
+		# so if any code using this class can check the current verbose / debug level
+		cached.verbose = self.verbose = verbose
+		cached.debug = self.debug = debug
+		if not cached.usecache:
+			pinfo("Forced hash recalculation, hash cache won't be used")
 
 		# handle backward compatibility, a.k.a. history debt
 		sr = ByPy.migratesettings()
 		if sr != const.ENoError:
 			# bail out
 			perr("Failed to migrate old settings.")
-			self.quit(const.EMigrationFailed)
+			sys.exit(const.EMigrationFailed)
 
 		self.__configdir = configdir.rstrip("/\\ ")
 		# os.path.join() may not handle unicode well on Python 2.7
@@ -387,12 +388,8 @@ class ByPy(object):
 			self.__verify = True
 		self.processes = processes
 
-		# these two variables are without leadning double underscaore "__" as to export the as public,
-		# so if any code using this class can check the current verbose / debug level
-		cached.verbose = self.verbose = verbose
-		cached.debug = self.debug = debug
-		if not cached.usecache:
-			pinfo("Forced hash recaculation, hash cache won't be used")
+		# in case of abortions, exceptions, etc
+		atexit.register(self.cleanup)
 
 		#TODO: SSL verification causes some much trouble for different Python version
 		# I give up and disable it for good, or for bad
@@ -474,7 +471,7 @@ class ByPy(object):
 				perr("Program authorization FAILED.\n"
 					"You need to authorize this program before using any PCS functions.\n"
 					"Quitting...\n")
-				self.quit(result)
+				sys.exit(result)
 
 		for proxy in ['HTTP_PROXY', 'HTTPS_PROXY']:
 			if proxy in os.environ:
@@ -503,7 +500,7 @@ class ByPy(object):
 								"minimum required version is {}.\n"
 								"Please run 'pip install -U bypy' to update and try again.".format(
 									const.__version__, minver))
-							self.quit(const.EUpdateNeeded)
+							sys.exit(const.EUpdateNeeded)
 						else:
 							self.__setting[const.SettingKey_LastUpdateCheckTime] = nowsec
 							self.savesetting()
@@ -524,7 +521,7 @@ class ByPy(object):
 			pr(msg)
 
 	def pd(self, msg, level = 1, **kwargs):
-		if self.debug >= level:
+		if self.debug and self.debug >= level:
 			pdbg(msg, kwargs)
 
 	def shalloverwrite(self, prompt):
@@ -588,7 +585,7 @@ class ByPy(object):
 						"then this error should be gone when you run 'bypy' with '{}' again.\n"
 						).format(formatex(pe), const.MultiprocessOption)
 				perr(errmsg)
-				self.quit(const.EFatal)
+				sys.exit(const.EFatal)
 
 	def __print_error_json(self, r):
 		try:
@@ -652,7 +649,7 @@ class ByPy(object):
 		self.__dump_exception(ex, url, pars, r, act)
 		perr("Fatal Exception, no way to continue.\nQuitting...\n")
 		perr("If the error is reproducible, run the program with `-dv` arguments again to get more info.\n")
-		self.quit(result)
+		sys.exit(result)
 		# we eat the exception, and use return code as the only
 		# error notification method, we don't want to mix them two
 		#raise # must notify the caller about the failure
@@ -717,7 +714,7 @@ class ByPy(object):
 					else:
 						result = const.EFatal
 						perr("FATAL: Token refreshing failed, can't continue.\nQuitting...\n")
-						self.quit(result)
+						sys.exit(result)
 				# File md5 not found, you should use upload API to upload the whole file.
 				elif ec == const.IEMD5NotFound: # and sc == 404:
 					self.pd("MD5 not found, rapidupload failed")
@@ -788,7 +785,8 @@ class ByPy(object):
 				"Or) Run this prog with the '" + const.DisableSslCheckOption + \
 				"' argument. This supresses the CA cert check "
 				"and always works.\n")
-				self.quit(result)
+				# sys.exit(result)
+				raise
 
 			# why so kludge? because requests' SSLError doesn't set
 			# the errno and strerror due to using **kwargs,
@@ -817,7 +815,8 @@ class ByPy(object):
 					self.__dump_exception(ex, url, pars, r, act)
 			else:
 				result = const.EFatal
-				self.__request_work_die(ex, url, pars, r, act)
+				# self.__request_work_die(ex, url, pars, r, act)
+				raise
 
 		except Exception as ex:
 			# OpenSSL SysCallError
@@ -831,7 +830,8 @@ class ByPy(object):
 					self.__dump_exception(ex, url, pars, r, act)
 			else:
 				result = const.EFatal
-				self.__request_work_die(ex, url, pars, r, act)
+				# self.__request_work_die(ex, url, pars, r, act)
+				raise
 
 		return result
 
@@ -867,7 +867,7 @@ class ByPy(object):
 					result = const.EMaxRetry
 					perr("Maximum number ({}) of tries failed.".format(tries))
 					if self.__quit_when_fail:
-						self.quit(const.EMaxRetry)
+						sys.exit(const.EMaxRetry)
 					break
 			else:
 				break
@@ -1024,7 +1024,7 @@ Possible fixes:
 		else:
 			perr("Fatal: All server authorizations failed.")
 			self.__prompt_clean()
-			self.quit(result)
+			sys.exit(result)
 
 		return result
 
@@ -1102,7 +1102,7 @@ Possible fixes:
 			else:
 				perr("Token-refreshing on all the servers failed")
 				self.__prompt_clean()
-				self.quit(result)
+				sys.exit(result)
 
 			return result
 		else:
@@ -1156,7 +1156,7 @@ Possible fixes:
 	def __remove_local_on_success(self, localpath):
 		if self.__deletesource:
 			self.pd("Removing local path '{}' after successful upload.".format(localpath))
-			result = cachedm.remove_path_and_cache(localpath)
+			result = cached.remove_path_and_cache(localpath)
 			if result == const.ENoError:
 				self.pd("Local path '{}' removed.".format(localpath))
 			else:
@@ -1945,7 +1945,7 @@ try to create a file at PCS by combining slices, having MD5s specified
 			else:
 				perr("Maximum number ({}) of tries failed.".format(tries))
 				if self.__quit_when_fail:
-					self.quit(const.EMaxRetry)
+					sys.exit(const.EMaxRetry)
 				return const.EMaxRetry
 
 	# requirment: self.__remote_json is already gotten
@@ -2593,7 +2593,7 @@ restore a file from the recycle bin
 		dlen = len(remotepath) + 1
 		for d in dirjs:
 			self.__remote_dir_contents.get(remotepath[rootlen:]).add(
-				d['path'][dlen:], PathDictTree('D', size = d['size'], md5 = d['md5']))
+				d['path'][dlen:], PathDictTree('D', size = d['size'], md5 = d['md5'] if 'md5' in d else ''))
 
 		for f in filejs:
 			self.__remote_dir_contents.get(remotepath[rootlen:]).add(
@@ -3059,7 +3059,7 @@ if not specified, it defaults to the root directory
 		pr("Cancelling offline (cloud) download task: {}".format(self.__cdl_task_id))
 		result = self.__cdl_cancel(self.__cdl_task_id)
 		pr("Result: {}".format(result))
-		self.quit(const.EAbort)
+		sys.exit(const.EAbort)
 
 	def __cdl_addmon(self, source_url, rpath, timeout = 3600):
 		pars = self.__prepare_cdl_add(source_url, rpath, timeout)
@@ -3400,8 +3400,7 @@ y/N/a (yes/NO/always)?
 
 def sighandler(signum, frame):
 	pr("Signal {} received, Abort".format(signum))
-	if gbypyinst:
-		gbypyinst.quit(const.EAbort)
+	sys.exit(const.EAbort)
 
 # http://www.gnu.org/software/libc/manual/html_node/Basic-Signal-Handling.html
 def setsighandler(signum, handler):
@@ -3611,131 +3610,128 @@ def main(argv=None): # IGNORE:C0111
 		perr("Requirement checking failed")
 		sys.exit(const.EFatal)
 
+	result = const.ENoError
+	if argv is None:
+		argv = sys.argv
+	else:
+		sys.argv.extend(argv)
+
+	setuphandlers()
+
+	parser = getparser()
+	args = parser.parse_args()
+	dl_args = ''
+	if not args.downloader_args:
+		if const.DownloaderArgsEnvKey in os.environ:
+			dl_args = os.environ[const.DownloaderArgsEnvKey]
+	else:
+		prefixlen = len(const.DownloaderArgsIsFilePrefix)
+		if args.downloader_args[:prefixlen] == const.DownloaderArgsIsFilePrefix: # file
+			with io.open(args.downloader_args[prefixlen:], 'r', encoding = 'utf-8') as f:
+				dl_args = f.read().strip()
+		else:
+			dl_args = args.downloader_args
+
+	# house-keeping reminder
+	# TODO: may need to move into ByPy for customized config dir
+	if os.path.exists(const.HashCachePath):
+		cachesize = getfilesize(const.HashCachePath)
+		if cachesize > 10 * const.OneM or cachesize == -1:
+			pwarn((
+				"*** WARNING ***\n"
+				"Hash Cache file '{0}' is very large ({1}).\n"
+				"This may affect program's performance (high memory consumption).\n"
+				"You can first try to run 'bypy.py cleancache' to slim the file.\n"
+				"But if the file size won't reduce (this warning persists),"
+				" you may consider deleting / moving the Hash Cache file '{0}'\n"
+				"*** WARNING ***\n\n\n").format(const.HashCachePath, human_size(cachesize)))
+
+	# check for situations that require no ByPy object creation first
+	if args.clean >= 1:
+		return clean_prog_files(args.clean, args.verbose, args.configdir)
+
+	# some arguments need some processing
 	try:
-		result = const.ENoError
-		if argv is None:
-			argv = sys.argv
-		else:
-			sys.argv.extend(argv)
+		slice_size = interpret_size(args.slice)
+	except (ValueError, KeyError):
+		perr("Error: Invalid slice size specified '{}'".format(args.slice))
+		return const.EArgument
 
-		setuphandlers()
+	try:
+		chunk_size = interpret_size(args.chunk)
+	except (ValueError, KeyError):
+		perr("Error: Invalid slice size specified '{}'".format(args.slice))
+		return const.EArgument
 
-		parser = getparser()
-		args = parser.parse_args()
-		dl_args = ''
-		if not args.downloader_args:
-			if const.DownloaderArgsEnvKey in os.environ:
-				dl_args = os.environ[const.DownloaderArgsEnvKey]
-		else:
-			prefixlen = len(const.DownloaderArgsIsFilePrefix)
-			if args.downloader_args[:prefixlen] == const.DownloaderArgsIsFilePrefix: # file
-				with io.open(args.downloader_args[prefixlen:], 'r', encoding = 'utf-8') as f:
-					dl_args = f.read().strip()
+	if len(args.command) <= 0 or \
+		(len(args.command) == 1 and args.command[0].lower() == 'help'):
+		parser.print_help()
+		return const.EArgument
+	elif len(args.command) == 2 and args.command[0].lower() == 'help':
+		ByPy.help(args.command[1])
+		return const.EArgument
+	elif args.command[0] in ByPy.__dict__: # dir(ByPy), dir(by)
+		#timeout = args.timeout or None
+
+		cached.usecache = not args.forcehash
+		bypyopt = {
+			'slice_size': slice_size,
+			'dl_chunk_size': chunk_size,
+			'verify': args.verify,
+			'retry': args.retry,
+			'timeout': args.timeout,
+			'quit_when_fail': args.quit,
+			'resumedownload': args.resumedl,
+			'incregex': args.incregex,
+			'exclude_wildcard': args.exclude,
+			'ondup': args.ondup,
+			'followlink': args.followlink,
+			'checkssl': args.checkssl,
+			'cacerts': args.cacerts,
+			'rapiduploadonly': args.rapiduploadonly,
+			'mirror': args.mirror,
+			'selectmirror': args.selectmirror,
+			'configdir': args.configdir,
+			'resumedl_revertcount': args.resumedl_revertcount,
+			'deletesource': args.deletesource,
+			'downloader': args.downloader,
+			'downloader_args': dl_args,
+			'verbose': args.verbose,
+			'debug': args.debug}
+		if Pool:
+			bypyopt['processes'] = args.processes
+
+		# we construct a ByPy object here.
+		# if you want to try PanAPI, simply replace ByPy with PanAPI, and all the bduss related function _should_ work
+		# I didn't use PanAPI here as I have never tried out those functions inside
+		by = ByPy(**bypyopt)
+		uargs = []
+		for arg in args.command[1:]:
+			if sys.version_info[0] < 3:
+				uargs.append(unicode(arg, gvar.SystemEncoding))
 			else:
-				dl_args = args.downloader_args
+				uargs.append(arg)
+		result = getattr(by, args.command[0])(*uargs)
+		if result != const.ENoError:
+			errmsg = '-' * 64 + "\nError {}{}".format(result, ': ' + const.ErrorExplanations[result] if result in const.ErrorExplanations else '')
+			perr(errmsg)
+	else:
+		perr("Error: Command '{}' not available.".format(args.command[0]))
+		parser.print_help()
+		return const.EParameter
 
-		# house-keeping reminder
-		# TODO: may need to move into ByPy for customized config dir
-		if os.path.exists(const.HashCachePath):
-			cachesize = getfilesize(const.HashCachePath)
-			if cachesize > 10 * const.OneM or cachesize == -1:
-				pwarn((
-				   "*** WARNING ***\n"
-				   "Hash Cache file '{0}' is very large ({1}).\n"
-				   "This may affect program's performance (high memory consumption).\n"
-				   "You can first try to run 'bypy.py cleancache' to slim the file.\n"
-				   "But if the file size won't reduce (this warning persists),"
-				   " you may consider deleting / moving the Hash Cache file '{0}'\n"
-				   "*** WARNING ***\n\n\n").format(const.HashCachePath, human_size(cachesize)))
-
-		# check for situations that require no ByPy object creation first
-		if args.clean >= 1:
-			return clean_prog_files(args.clean, args.verbose, args.configdir)
-
-		# some arguments need some processing
-		try:
-			slice_size = interpret_size(args.slice)
-		except (ValueError, KeyError):
-			perr("Error: Invalid slice size specified '{}'".format(args.slice))
-			return const.EArgument
-
-		try:
-			chunk_size = interpret_size(args.chunk)
-		except (ValueError, KeyError):
-			perr("Error: Invalid slice size specified '{}'".format(args.slice))
-			return const.EArgument
-
-		if len(args.command) <= 0 or \
-			(len(args.command) == 1 and args.command[0].lower() == 'help'):
-			parser.print_help()
-			return const.EArgument
-		elif len(args.command) == 2 and args.command[0].lower() == 'help':
-			ByPy.help(args.command[1])
-			return const.EArgument
-		elif args.command[0] in ByPy.__dict__: # dir(ByPy), dir(by)
-			#timeout = args.timeout or None
-
-			cached.usecache = not args.forcehash
-			bypyopt = {
-				'slice_size': slice_size,
-				'dl_chunk_size': chunk_size,
-				'verify': args.verify,
-				'retry': args.retry,
-				'timeout': args.timeout,
-				'quit_when_fail': args.quit,
-				'resumedownload': args.resumedl,
-				'incregex': args.incregex,
-				'exclude_wildcard': args.exclude,
-				'ondup': args.ondup,
-				'followlink': args.followlink,
-				'checkssl': args.checkssl,
-				'cacerts': args.cacerts,
-				'rapiduploadonly': args.rapiduploadonly,
-				'mirror': args.mirror,
-				'selectmirror': args.selectmirror,
-				'configdir': args.configdir,
-				'resumedl_revertcount': args.resumedl_revertcount,
-				'deletesource': args.deletesource,
-				'downloader': args.downloader,
-				'downloader_args': dl_args,
-				'verbose': args.verbose,
-				'debug': args.debug}
-			if Pool:
-				bypyopt['processes'] = args.processes
-
-			# we construct a ByPy object here.
-			# if you want to try PanAPI, simply replace ByPy with PanAPI, and all the bduss related function _should_ work
-			# I didn't use PanAPI here as I have never tried out those functions inside
-			by = ByPy(**bypyopt)
-			uargs = []
-			for arg in args.command[1:]:
-				if sys.version_info[0] < 3:
-					uargs.append(unicode(arg, gvar.SystemEncoding))
-				else:
-					uargs.append(arg)
-			result = getattr(by, args.command[0])(*uargs)
-			if result != const.ENoError:
-				errmsg = '-' * 64 + "\nError {}{}".format(result, ': ' + const.ErrorExplanations[result] if result in const.ErrorExplanations else '')
-				perr(errmsg)
-		else:
-			perr("Error: Command '{}' not available.".format(args.command[0]))
-			parser.print_help()
-			return const.EParameter
-
-	except KeyboardInterrupt:
-		# handle keyboard interrupt
-		pr("KeyboardInterrupt")
-		pr("Abort")
-	except Exception as ex:
-		# NOTE: Capturing the exeption as 'ex' seems matters, otherwise this:
-		# except Exception ex:
-		# will sometimes give exception ...
-		perr("Exception occurred:\n{}".format(formatex(ex)))
-		pr("Abort")
-		raise
-	finally:
-		if by:
-			by.quit(result)
+	# just let it spew exceptions so that we have the stack trace on death
+	# except KeyboardInterrupt:
+	# 	# handle keyboard interrupt
+	# 	pr("KeyboardInterrupt")
+	# 	pr("Abort")
+	# except Exception as ex:
+	# 	# NOTE: Capturing the exeption as 'ex' seems to matter, otherwise this:
+	# 	# except Exception:
+	# 	# will sometimes give exception ...
+	# 	perr("Exception occurred:\n{}".format(formatex(ex)))
+	# 	pr("Abort")
+	#	raise
 
 if __name__ == "__main__":
 	main()

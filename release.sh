@@ -3,8 +3,10 @@
 #set -o errexit
 #set -x
 
-py2venv="$HOME/Documents/t/venv27"
-py3venv="$HOME/Documents/t/venv34"
+trap "echo '=== Release script interrupted ==='; exit -1" SIGINT
+
+py2venv=${py2venv-"$HOME/Documents/t/pyvenv/2.7.16"}
+py3venv=${py3venv-"$HOME/Documents/t/pyvenv/3.7.3"}
 
 actual=0
 build=0

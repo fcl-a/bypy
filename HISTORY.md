@@ -1,5 +1,8 @@
 ### Version History:
 
+- 1.6.6: Let it cry when dies, so we can have some trace
+- 1.6.5: Fix `KeyError: u'md5'` in remote directory walking
+- 1.6.4: Fix `--move` argument causing exception
 - 1.6.3: Change default timeout to 5 minutes
 - 1.6.2: Properly handle (treat it as no error) error_code 31061 (file already exists) from PCS
 - 1.6.1: Ensure cache loading/saving failures won't affect normal operations; Fix the bug that clean up code not called on exit
